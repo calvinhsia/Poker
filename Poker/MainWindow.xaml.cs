@@ -159,10 +159,10 @@ namespace Poker
                     chart.DataBind();
                     _txtStatus.Text = hand.PokerValue().ToString();
                 };
-                Action ShuffleAndDeal = () =>
+                Action<int> ShuffleAndDeal = (nHands) =>
                 {
                     PokerHand hand = null;
-                    for (int i = 0; i < 1000; i++)
+                    for (int i = 0; i < nHands; i++)
                     {
                         numHands++;
                         // shuffle
@@ -177,14 +177,7 @@ namespace Poker
                         // deal
                         hand = new PokerHand(deck.Take(5).OrderBy(c => c).ToList());
                         var val = hand.PokerValue().ToString();
-                        if (!dictHandValues.ContainsKey(val))
-                        {
-                            dictHandValues[val] = 1;
-                        }
-                        else
-                        {
-                            dictHandValues[val]++;
-                        }
+                        dictHandValues[val]++;
                     }
                     //                    if (numHands % 1000000 == 0)
                     {
@@ -214,13 +207,13 @@ namespace Poker
                     {
                         if (chkRun.IsChecked == true)
                         {
-                            ShuffleAndDeal();
+                            ShuffleAndDeal(100);
                         }
                     },
                     this.Dispatcher);
                 this.MouseUp += (om, em) =>
                 {
-                    ShuffleAndDeal();
+                    ShuffleAndDeal(1);
                     //                    timer.IsEnabled = !timer.IsEnabled;
                 };
             }
