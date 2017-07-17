@@ -28,7 +28,7 @@ namespace Poker
     /// </summary>
     public partial class MainWindow : Window
     {
-        public int nMillisecs { get; set; } = 500;
+        public int NumDealsPerGroup { get; set; } = 1;
         int hghtCard = 100;
         int wdthCard = 80;
         public MainWindow()
@@ -69,21 +69,14 @@ namespace Poker
                 sp.Children.Add(new Label() { Content = "Card Dealing Program." });
                 var spControls = new StackPanel() { Orientation = Orientation.Horizontal };
                 sp.Children.Add(spControls);
-                spControls.Children.Add(new Label() { Content = "mSecs" });
-                var txtnMSec = new TextBox()
+                spControls.Children.Add(new Label() { Content = "nDeals" });
+                var txtnDeals = new TextBox()
                 {
-                    Width = 50
+                    Width = 100,
+                    ToolTip=""
                 };
-                txtnMSec.SetBinding(TextBox.TextProperty, nameof(nMillisecs));
-                spControls.Children.Add(txtnMSec);
-
-                var chkRun = new CheckBox()
-                {
-                    Content = "Go",
-                    ToolTip = "Click to deal one at a time",
-                    IsChecked = true
-                };
-                spControls.Children.Add(chkRun);
+                txtnDeals.SetBinding(TextBox.TextProperty, nameof(NumDealsPerGroup));
+                spControls.Children.Add(txtnDeals);
 
                 _txtStatus = new TextBox()
                 {
@@ -147,9 +140,10 @@ namespace Poker
                 }
                 var numHands = 0;
                 var rand = new Random(1);
-                Action<PokerHand> UpdateUI = (hand) =>
+                PokerHand hand = null;
+                Action UpdateUI = () =>
                 {
-                    series1.ToolTip = $"Num deals = {numHands}";
+                    series1.ToolTip = $"Num deals = {numHands:n0}";
                     // draw the cards
                     for (int i = 0; i < PokerHand.HandSize; i++)
                     {
@@ -159,69 +153,62 @@ namespace Poker
                     chart.DataBind();
                     _txtStatus.Text = hand.PokerValue().ToString();
                 };
-                Action<int> ShuffleAndDeal = (nHands) =>
-                {
-                    PokerHand hand = null;
-                    for (int i = 0; i < nHands; i++)
-                    {
-                        numHands++;
-                        // shuffle
-                        for (int n = 0; n < 52; n++)
-                        {
-                            //get a random number 0-51
-                            var tempNdx = rand.Next(52);
-                            var tmp = deck[tempNdx];
-                            deck[tempNdx] = deck[n];
-                            deck[n] = tmp;
-                        }
-                        // deal
-                        hand = new PokerHand(deck.Take(5).OrderBy(c => c).ToList());
-                        var val = hand.PokerValue().ToString();
-                        dictHandValues[val]++;
-                    }
-                    //                    if (numHands % 1000000 == 0)
-                    {
-                        canvas.Dispatcher.BeginInvoke(
-                            DispatcherPriority.Send,
-                            new Action(() =>
-                        {
-                            UpdateUI(hand);
-                        }));
-                        Thread.Sleep(1000);
-                    }
-                    //UpdateUI(hand);
-                };
-                //for (int jj = 0; jj < 10; jj++)
-                //{
-                //    var tsk = Task.Run(() =>
-                //    {
-                //        ShuffleAndDeal();
-                //    });
+                Action<int> ShuffleAndDeal = (nDeals) =>
+                 {
+                     for (int i = 0; i < nDeals; i++)
+                     {
+                         numHands++;
+                         // shuffle
+                         for (int n = 0; n < 52; n++)
+                         {
+                             //get a random number 0-51
+                             var tempNdx = rand.Next(52);
+                             var tmp = deck[tempNdx];
+                             deck[tempNdx] = deck[n];
+                             deck[n] = tmp;
+                         }
+                         // deal
+                         hand = new PokerHand(deck.Take(5).OrderBy(c => c).ToList());
+                         var val = hand.PokerValue().ToString();
+                         dictHandValues[val]++;
+                     }
+                 };
 
-                //    tsk.Wait();
-                //}
-                var timer = new DispatcherTimer(
-                    TimeSpan.FromMilliseconds(100),
-                    DispatcherPriority.Normal,
-                    (o, args) =>
-                    {
-                        if (chkRun.IsChecked == true)
-                        {
-                            ShuffleAndDeal(100);
-                        }
-                    },
-                    this.Dispatcher);
+                var btnGo = new Button()
+                {
+                    Content="_Go",
+                    Width = 20
+                };
+                spControls.Children.Add(btnGo);
+                bool fIsGoing = false;
+                btnGo.Click +=async (ob, eb) =>
+                  {
+                      fIsGoing = !fIsGoing;
+                      if (fIsGoing)
+                      {
+                          while (fIsGoing)
+                          {
+                              await Task.Run(() =>
+                              {
+                                  ShuffleAndDeal(NumDealsPerGroup);
+                              });
+                              UpdateUI();
+                          }
+                      }
+                  };
                 this.MouseUp += (om, em) =>
                 {
                     ShuffleAndDeal(1);
-                    //                    timer.IsEnabled = !timer.IsEnabled;
+                    UpdateUI();
                 };
+                btnGo.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, null));
             }
             catch (Exception ex)
             {
                 this.Content = ex.ToString();
             }
         }
+
         // http://www.math.hawaii.edu/~ramsey/Probability/PokerHands.html
         internal class PokerHand
         {
