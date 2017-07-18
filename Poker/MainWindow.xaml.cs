@@ -28,7 +28,7 @@ namespace Poker
     /// </summary>
     public partial class MainWindow : Window
     {
-        public int NumDealsPerGroup { get; set; } = 1;
+        public int NumDealsPerGroup { get; set; } = 100;
         int hghtCard = 100;
         int wdthCard = 80;
         public MainWindow()
@@ -99,18 +99,28 @@ namespace Poker
                 chart.Dock = System.Windows.Forms.DockStyle.Fill;
                 var chartArea = new ChartArea("ChartArea");
                 chart.ChartAreas.Add(chartArea);
-                chartArea.AxisX.Interval = 1;
                 var wfh = new WindowsFormsHost();
                 wfh.Height = 600;
                 wfh.Child = chart;
                 sp.Children.Add(wfh);
 
-                chart.DataSource = dictHandValues;
+                var dictPairDist = new Dictionary<int, int>(); // #hands that are a Pair, count
                 var series1 = new Series();
-                series1.ChartType = SeriesChartType.Bar;
                 chart.Series.Add(series1);
+
+                //*
+                chart.DataSource = dictPairDist;
+                series1.ChartType = SeriesChartType.Column;
                 series1.XValueMember = "Key";
                 series1.YValueMembers = "Value";
+                /*/
+                chart.DataSource = dictHandValues;
+                series1.ChartType = SeriesChartType.Bar;
+                series1.XValueMember = "Key";
+                series1.YValueMembers = "Value";
+                chartArea.AxisX.Interval = 1;
+                //*/
+
                 var canvas = new Canvas() { Height = hghtCard + 3 };
                 sp.Children.Add(canvas);
                 sp.Children.Add(_txtStatus);
@@ -155,6 +165,7 @@ namespace Poker
                 };
                 Action<int> ShuffleAndDeal = (nDeals) =>
                  {
+                     int nPairs = 0;
                      for (int i = 0; i < nDeals; i++)
                      {
                          numHands++;
@@ -169,8 +180,20 @@ namespace Poker
                          }
                          // deal
                          hand = new PokerHand(deck.Take(5).OrderBy(c => c).ToList());
-                         var val = hand.PokerValue().ToString();
-                         dictHandValues[val]++;
+                         var val = hand.PokerValue();
+                         if (val == PokerHand.HandValues.Pair)
+                         {
+                             nPairs++;
+                         }
+                         dictHandValues[val.ToString()]++;
+                     }
+                     if (!dictPairDist.ContainsKey(nPairs))
+                     {
+                         dictPairDist[nPairs] = 1;
+                     }
+                     else
+                     {
+                         dictPairDist[nPairs]++;
                      }
                  };
 
@@ -186,6 +209,7 @@ namespace Poker
                       fIsGoing = !fIsGoing;
                       if (fIsGoing)
                       {
+                          dictPairDist.Clear();
                           while (fIsGoing)
                           {
                               await Task.Run(() =>
