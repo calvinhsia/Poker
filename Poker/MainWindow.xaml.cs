@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.Windows.Forms.DataVisualization.Charting;
 using System.Windows.Forms.Integration;
 using System.Threading.Tasks;
+using System.Text;
 
 /*
  File->new->Project->C#->WPF App "Poker"
@@ -28,7 +29,7 @@ namespace Poker
     /// </summary>
     public partial class MainWindow : Window
     {
-        public int NumDealsPerGroup { get; set; } = 100;
+        public int NumDealsPerGroup { get; set; } = 1000;
         int hghtCard = 100;
         int wdthCard = 80;
         public MainWindow()
@@ -52,8 +53,8 @@ namespace Poker
                 _txtStatus.Dispatcher.BeginInvoke(
                     new Action(() =>
                     {
-                        // this action executes on main thread
-                        var str = string.Format(dt + msg + "\r\n", args);
+                // this action executes on main thread
+                var str = string.Format(dt + msg + "\r\n", args);
                         _txtStatus.AppendText(str);
                         _txtStatus.ScrollToEnd();
                     }));
@@ -73,7 +74,7 @@ namespace Poker
                 var txtnDeals = new TextBox()
                 {
                     Width = 100,
-                    ToolTip=""
+                    ToolTip = ""
                 };
                 txtnDeals.SetBinding(TextBox.TextProperty, nameof(NumDealsPerGroup));
                 spControls.Children.Add(txtnDeals);
@@ -84,7 +85,10 @@ namespace Poker
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
                     IsUndoEnabled = false,
-                    MaxHeight = 60,
+                    FontFamily = new FontFamily("Courier New"),
+                    FontSize = 10,
+                    Height = 200,
+                    MaxHeight = 200,
                     HorizontalContentAlignment = HorizontalAlignment.Left
                 };
 
@@ -108,7 +112,8 @@ namespace Poker
                 var series1 = new Series();
                 chart.Series.Add(series1);
 
-                //*
+                //* add a "/" at the beginning of this line to use alternate code
+                 // insert code here later         
                 chart.DataSource = dictPairDist;
                 series1.ChartType = SeriesChartType.Column;
                 series1.XValueMember = "Key";
@@ -119,6 +124,7 @@ namespace Poker
                 series1.XValueMember = "Key";
                 series1.YValueMembers = "Value";
                 chartArea.AxisX.Interval = 1;
+                chartArea.AxisY.LabelStyle.Format = "#,#";
                 //*/
 
                 var canvas = new Canvas() { Height = hghtCard + 3 };
@@ -148,82 +154,106 @@ namespace Poker
                     Canvas.SetLeft(img, i * wdthCard);
                     //                    Canvas.SetTop(img, suit * (1 + hghtCard));
                 }
-                var numHands = 0;
+                var numHands = 0l;
                 var rand = new Random(1);
                 PokerHand hand = null;
                 Action UpdateUI = () =>
                 {
-                    series1.ToolTip = $"Num deals = {numHands:n0}";
-                    // draw the cards
-                    for (int i = 0; i < PokerHand.HandSize; i++)
+                    if (numHands % 100000 == 0)
                     {
-                        var img = (Image)canvas.Children[i];
-                        img.Source = hand.Cards[i].bmpSource;
+                        series1.ToolTip = $"Num deals = {numHands:n0} {_txtStatus.Text}";
+                        // draw the cards
+                        for (int i = 0; i < PokerHand.HandSize; i++)
+                        {
+                            var img = (Image)canvas.Children[i];
+                            img.Source = hand.Cards[i].bmpSource;
+                        }
+                        chart.DataBind();
+                        var sb = new StringBuilder();
+                        foreach (var kvp in dictHandValues)
+                        {
+                            sb.Append($" {kvp.Key}={kvp.Value * 100.0 / numHands,9:f6}");
+                        }
+                        _txtStatus.Text = $@"{hand.PokerValue().ToString(),-15}";
+                        _txtStatus.AppendText($"\r\nN={numHands:n0} {sb.ToString()}");
                     }
-                    chart.DataBind();
-                    _txtStatus.Text = hand.PokerValue().ToString();
                 };
                 Action<int> ShuffleAndDeal = (nDeals) =>
-                 {
-                     int nPairs = 0;
-                     for (int i = 0; i < nDeals; i++)
-                     {
-                         numHands++;
-                         // shuffle
-                         for (int n = 0; n < 52; n++)
-                         {
-                             //get a random number 0-51
-                             var tempNdx = rand.Next(52);
-                             var tmp = deck[tempNdx];
-                             deck[tempNdx] = deck[n];
-                             deck[n] = tmp;
-                         }
-                         // deal
-                         hand = new PokerHand(deck.Take(5).OrderBy(c => c).ToList());
-                         var val = hand.PokerValue();
-                         if (val == PokerHand.HandValues.Pair)
-                         {
-                             nPairs++;
-                         }
-                         dictHandValues[val.ToString()]++;
-                     }
-                     if (!dictPairDist.ContainsKey(nPairs))
-                     {
-                         dictPairDist[nPairs] = 1;
-                     }
-                     else
-                     {
-                         dictPairDist[nPairs]++;
-                     }
-                 };
+                {
+                    int nPairs = 0;
+                    for (int nDeal = 0; nDeal < nDeals; nDeal++)
+                    {
+                        numHands++;
+
+                        // shuffle
+                        for (int n = 0; n < 52; n++)
+                        {
+                            //get a random number 0-51
+                            var tempNdx = rand.Next(52);
+                            var tmp = deck[tempNdx];
+                            deck[tempNdx] = deck[n];
+                            deck[n] = tmp;
+                        }
+                        //var newdeck = new Card[52];
+                        //for (int i = 0; i < 26; i++)
+                        //{
+                        //    newdeck[2 * i] = deck[i];
+                        //    newdeck[2 * i + 1] = deck[i + 26];
+                        //}
+
+                        //for (int n = 0; n < 52; n++)
+                        //{
+                        //    deck[n] = newdeck[n];
+                        //}
+                        // deal
+                        hand = new PokerHand(deck.Take(5).ToList());
+                        var val = hand.PokerValue();
+                        if (val == PokerHand.HandValues.Pair)
+                        {
+                            nPairs++;
+                        }
+                        dictHandValues[val.ToString()]++;
+                    }
+                    if (!dictPairDist.ContainsKey(nPairs))
+                    {
+                        dictPairDist[nPairs] = 1;
+                    }
+                    else
+                    {
+                        dictPairDist[nPairs]++;
+                    }
+                };
 
                 var btnGo = new Button()
                 {
-                    Content="_Go",
+                    Content = "_Go",
                     Width = 20
                 };
                 spControls.Children.Add(btnGo);
                 bool fIsGoing = false;
-                btnGo.Click +=async (ob, eb) =>
-                  {
-                      fIsGoing = !fIsGoing;
-                      if (fIsGoing)
-                      {
-                          dictPairDist.Clear();
-                          while (fIsGoing)
-                          {
-                              await Task.Run(() =>
-                              {
-                                  ShuffleAndDeal(NumDealsPerGroup);
-                              });
-                              UpdateUI();
-                          }
-                      }
-                  };
+                btnGo.Click += async (ob, eb) =>
+                {
+                    fIsGoing = !fIsGoing;
+                    if (fIsGoing)
+                    {
+                        dictPairDist.Clear();
+                        while (fIsGoing)
+                        {
+                            await Task.Run(() =>
+                            {
+                                ShuffleAndDeal(NumDealsPerGroup);
+                            });
+                            UpdateUI();
+                        }
+                    }
+                };
                 this.MouseUp += (om, em) =>
                 {
-                    ShuffleAndDeal(1);
-                    UpdateUI();
+                    if (!fIsGoing)
+                    {
+                        ShuffleAndDeal(1);
+                        UpdateUI();
+                    }
                 };
                 btnGo.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, null));
             }
@@ -262,7 +292,7 @@ namespace Poker
                 var value = HandValues.Nothing;
                 var groupsBySuits = Cards.GroupBy(c => c.suit);
                 var groupsByRank = Cards.OrderBy(c => c.denom).GroupBy(c => c.denom);
-                if (groupsBySuits.Count() == 1) // only one suit. Flush See if it's a straight
+                if (groupsBySuits.Count() == 1) // only one suit= Flush. See if it's a straight
                 {
                     if (IsStraight(groupsByRank))
                     {
@@ -282,14 +312,14 @@ namespace Poker
                 }
                 else
                 {
-                    // if the hand has a 3,5,6,9,J, then there are 5 groups by denom
+                    // if the hand has none of a kind: e.g. a 3,5,6,9,J, then there are 5 groups by denom
                     // if there's a pair, then there will be 4 groups
                     // 2 pair: there will be 3
                     // if there's a triple, then there will be 2 (full house) or 3 groups
                     // 4 of a kind: 2 groups
                     switch (groupsByRank.Count())
                     {
-                        case 5: // there are 5 groups of denoms, so can only be straigh
+                        case 5: // there are 5 groups of denoms, so can only be straight
                             if (IsStraight(groupsByRank))
                             {
                                 value = HandValues.Straight;
@@ -336,8 +366,9 @@ namespace Poker
                 bool isStraight = false;
                 if (groupsByRank.Count() == HandSize)
                 {
-                    var first = groupsByRank.First().Min().denom;
-                    var last = groupsByRank.Last().Max().denom;
+                    // the groups are sorted
+                    var first = groupsByRank.First().First().denom;
+                    var last = groupsByRank.Last().First().denom;
                     if (first + HandSize - 1 == last)
                     {
                         isStraight = true;
